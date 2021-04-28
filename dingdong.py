@@ -1,5 +1,6 @@
 # dingdong.py
 import discord
+from discord.errors import HTTPException
 from discord.ext import commands
 from discord.ext.commands import Cog
 import json
@@ -29,6 +30,7 @@ extensions = ["cogs.moderation","cogs.general","cogs.fun","cogs.computer"]
 @client.event
 async def on_ready():
     print("The doorbell rang...")
+    #print([guild for guild in client.guilds])
     # Set presence
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"for {prefix}[command]"))
 @client.command(name="reload", description="Reloads extension.")
@@ -47,6 +49,44 @@ async def reload(ctx, content):
         await ctx.send(f"Reloading extension {content}...")
         client.reload_extension(content)
         await ctx.send(f"Reloaded extension {content}. May have failed; check the logs!")
+@client.command(name="cv", description="Change DingDong's avatar.")
+async def avchanger(ctx):
+    if ctx.message.attachments == []:
+        await ctx.send("DingDong only accepts Discord attachments attached on the same message.")
+        return
+    if ctx.message.attachments != []:
+        attachment = ctx.message.attachments[0]
+        if attachment.content_type[0:5] == "image":
+            await attachment.save("dingdongavatar.png")
+            with open("dingdongavatar.png", "rb") as pic:
+                pfp = pic.read()
+            await client.user.edit(avatar=pfp)
+            await ctx.send("Avatar changed.")
+        else:
+            await ctx.send("Please attach a compatible image file.")
+@avchanger.error
+async def avchanger_error(ctx,error):
+    if isinstance(error, commands.CommandInvokeError):
+        await ctx.send("Sorry, but Discord restricts bots to changing their avatar 2 times with a 10 minute cooldown.")
+# Message delete
+@client.event
+async def on_message_delete(message):
+    channel = await client.fetch_channel(713855953782702103)
+    await channel.send(f"Someone tried to delete a message.\nAuthor: {message.author}\nMessage: {message.content}\nMessage created at: {message.created_at}\nChannel: #{message.channel}\nGuild: {message.guild}")
+    if message.attachments != []:
+        await channel.send(message.attachments[0].url)
+# Message edit
+@client.event
+async def on_message_edit(message, nmessage):
+    channel = await client.fetch_channel(713855953782702103)
+    if message.edited_at == None:
+        await channel.send(f"Someone tried to edit their message.\nAuthor: {message.author}\nOriginal message: {message.content}\nNew message: {nmessage.content}\nOriginal time: {message.created_at}\nTime of edit: No prior edits\nChannel: #{message.channel}\nGuild: {message.guild}")
+        if message.attachments != []:
+            await channel.send(message.attachments[0].url)
+    else:
+        await channel.send(f"Someone tried to edit their message.\nAuthor: {message.author}\nOriginal Message: {message.content}\nNew message: {nmessage.content}\nOriginal time: {message.created_at}\nTime of edit: {message.edited_at}\nChannel: #{message.channel}\nGuild: {message.guild}")
+        if message.attachments != []:
+            await channel.send(message.attachments[0].url)
 if __name__ == "__main__":
     # load extensions on startup
     for extension in extensions:
